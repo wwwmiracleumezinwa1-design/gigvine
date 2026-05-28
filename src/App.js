@@ -476,7 +476,7 @@ export default function GigMinistry() {
         <style>{STYLES}</style>
         <div className="loading-screen">
           <div className="big-spinner" />
-          <p>Loading GigMinistry…</p>
+          <p>Loading Gigvine…</p>
         </div>
       </div>
     );
@@ -489,7 +489,15 @@ export default function GigMinistry() {
       {/* Navbar */}
       <nav className="nav">
         <button className="nav-logo" onClick={() => setPage("home")}>
-          ♪ <span>Gig</span>Ministry
+          <svg width="22" height="22" viewBox="0 0 44 44" fill="none" style={{marginRight:4}}>
+            <path d="M22 38 Q16 30 18 22 Q20 14 19 8" stroke="#2d5a2d" strokeWidth="2.5" strokeLinecap="round"/>
+            <ellipse cx="16" cy="28" rx="7" ry="4" fill="#2d5a2d" transform="rotate(-30 16 28)"/>
+            <ellipse cx="20" cy="18" rx="7" ry="4" fill="#2d5a2d" transform="rotate(20 20 18)"/>
+            <ellipse cx="19" cy="8" rx="6" ry="4" fill="#C9A84C" transform="rotate(-20 19 8)"/>
+            <line x1="25" y1="6" x2="25" y2="0" stroke="#C9A84C" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M25 0 Q33 3 30 9" stroke="#C9A84C" strokeWidth="2" fill="none" strokeLinecap="round"/>
+          </svg>
+          <span>Gig</span>vine
         </button>
         <div className="nav-links">
           <button className="nav-link" onClick={() => setPage("search")}>Find Musicians</button>
@@ -574,7 +582,7 @@ export default function GigMinistry() {
       )}
 
       <footer className="footer">
-        © 2025 <strong>GigMinistry</strong>. Connecting churches and musicians for His glory.
+        © 2025 <strong>Gigvine</strong>. Connecting churches and musicians for His glory.
       </footer>
     </div>
   );
@@ -1058,7 +1066,7 @@ function LoginModal({ onClose, onLogin, switchToSignup, hint }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <h2 className="modal-title">Welcome back</h2>
-            <p className="modal-sub">{hint || "Log in to your GigMinistry account"}</p>
+            <p className="modal-sub">{hint || "Log in to your Gigvine account"}</p>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
@@ -1111,7 +1119,7 @@ function SignupModal({ onClose, onSignup, switchToLogin }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <h2 className="modal-title">Create Account</h2>
-            <p className="modal-sub">Join the GigMinistry community</p>
+            <p className="modal-sub">Join the Gigvine community</p>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
