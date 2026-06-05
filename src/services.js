@@ -3,6 +3,9 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  reload,
 } from "firebase/auth";
 import {
   doc,
@@ -18,12 +21,27 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
+// ─── Password Validation ──────────────────────────────────────────────────────
+
+export function validatePassword(password) {
+  const errors = [];
+  if (password.length < 8) errors.push("At least 8 characters");
+  if (!/[A-Z]/.test(password)) errors.push("At least one uppercase letter");
+  if (!/[0-9]/.test(password)) errors.push("At least one number");
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password))
+    errors.push("At least one special character (!@#$%...)");
+  return errors;
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export function listenToAuthState(callback) {
   return onAuthStateChanged(auth, async (firebaseUser) => {
     if (firebaseUser) {
       const profile = await getUserProfile(firebaseUser.uid);
+      if (profile) {
+        profile.emailVerified = firebaseUser.emailVerified;
+      }
       callback(profile);
     } else {
       callback(null);
@@ -32,8 +50,17 @@ export function listenToAuthState(callback) {
 }
 
 export async function signup({ name, email, password, role }) {
+  // Validate password before creating account
+  const errors = validatePassword(password);
+  if (errors.length > 0) {
+    throw new Error("Password must meet requirements: " + errors.join(", "));
+  }
+
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   const uid = cred.user.uid;
+
+  // Send verification email
+  await sendEmailVerification(cred.user);
 
   const profile = {
     id: uid,
@@ -51,16 +78,41 @@ export async function signup({ name, email, password, role }) {
   };
 
   await setDoc(doc(db, "users", uid), profile);
+  profile.emailVerified = false;
   return profile;
 }
 
 export async function login(email, password) {
   const cred = await signInWithEmailAndPassword(auth, email, password);
-  return await getUserProfile(cred.user.uid);
+  const profile = await getUserProfile(cred.user.uid);
+  if (profile) {
+    profile.emailVerified = cred.user.emailVerified;
+  }
+  return profile;
 }
 
 export async function logout() {
   await signOut(auth);
+}
+
+export async function resendVerificationEmail() {
+  const user = auth.currentUser;
+  if (user && !user.emailVerified) {
+    await sendEmailVerification(user);
+  }
+}
+
+export async function resetPassword(email) {
+  await sendPasswordResetEmail(auth, email);
+}
+
+export async function refreshEmailVerification() {
+  const user = auth.currentUser;
+  if (user) {
+    await reload(user);
+    return user.emailVerified;
+  }
+  return false;
 }
 
 // ─── User / Profile ───────────────────────────────────────────────────────────
@@ -78,8 +130,6 @@ export async function updateUserProfile(uid, updates) {
 // ─── Musicians ────────────────────────────────────────────────────────────────
 
 export async function getMusicians({ instrument, location, minExp } = {}) {
-  // Firestore doesn't support multi-field inequality queries on free tier easily,
-  // so we fetch all musicians and filter client-side for the MVP.
   const q = query(collection(db, "users"), where("role", "==", "musician"));
   const snap = await getDocs(q);
   let musicians = snap.docs.map(d => ({ id: d.id, ...d.data() }));

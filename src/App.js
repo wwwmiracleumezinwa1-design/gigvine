@@ -11,6 +11,10 @@ import {
   getBookingsForMusician,
   getBookingsForClient,
   updateBookingStatus,
+  resendVerificationEmail,
+  resetPassword,
+  refreshEmailVerification,
+  validatePassword,
 } from "./services";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -88,19 +92,23 @@ const STYLES = `
   .nav-btn:hover { background: var(--gold-light); transform: translateY(-1px); }
 
   .hero {
-    background: linear-gradient(135deg, #1A2F1A 0%, #0f1f0f 50%, #243824 100%);
+    background: #1A2F1A;
     position: relative; overflow: hidden;
     padding: 90px 24px 80px; text-align: center;
   }
   .hero::before {
     content: '';
     position: absolute; inset: 0;
-    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(201,168,76,0.10) 0%, transparent 70%);
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(201,168,76,0.08) 0%, transparent 70%);
   }
   .hero-pattern {
-    position: absolute; inset: 0; opacity: 0.04;
-    background-image: repeating-linear-gradient(45deg, var(--gold) 0, var(--gold) 1px, transparent 0, transparent 50%);
-    background-size: 24px 24px;
+    position: absolute; inset: 0;
+    display: flex; align-items: stretch;
+  }
+  .hero-pattern svg {
+    width: 100%; height: 100%;
+    position: absolute; inset: 0;
+    object-fit: cover;
   }
   .hero-content { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; }
   .hero-badge {
@@ -413,7 +421,39 @@ const STYLES = `
   }
   .filter-group select:focus, .filter-group input:focus { border-color: var(--purple); }
 
-  .spinner {
+  .verify-banner {
+    background: rgba(201,168,76,0.12);
+    border-bottom: 1px solid rgba(201,168,76,0.3);
+    padding: 10px 24px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px; flex-wrap: wrap;
+    font-size: 13px; color: #7a5c10;
+  }
+  .verify-banner button {
+    background: var(--gold); color: var(--purple);
+    border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px; font-weight: 700;
+    padding: 5px 14px; border-radius: 6px;
+    transition: background .2s;
+  }
+  .verify-banner button:hover { background: var(--gold-light); }
+
+  .password-rules { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .password-rule {
+    font-size: 12px; display: flex; align-items: center; gap: 6px;
+  }
+  .password-rule.pass { color: #15803d; }
+  .password-rule.fail { color: #b91c1c; }
+
+  .password-strength {
+    height: 4px; border-radius: 2px; margin-top: 6px;
+    background: var(--border); overflow: hidden;
+  }
+  .password-strength-bar {
+    height: 100%; border-radius: 2px;
+    transition: width .3s, background .3s;
+  }
     display: inline-block; width: 18px; height: 18px;
     border: 2px solid rgba(255,255,255,0.3);
     border-top-color: white; border-radius: 50%;
@@ -515,6 +555,11 @@ export default function GigMinistry() {
         </div>
       </nav>
 
+      {/* Email verification banner */}
+      {currentUser && !currentUser.emailVerified && (
+        <VerifyBanner currentUser={currentUser} setCurrentUser={setCurrentUser} />
+      )}
+
       {/* Pages */}
       {page === "home" && (
         <HomePage
@@ -556,6 +601,7 @@ export default function GigMinistry() {
           onClose={() => setModal(null)}
           onLogin={(user) => { setCurrentUser(user); setModal(null); }}
           switchToSignup={() => setModal("signup")}
+          switchToForgot={() => setModal("forgot")}
         />
       )}
       {modal === "signup" && (
@@ -577,7 +623,15 @@ export default function GigMinistry() {
           onClose={() => setModal(null)}
           onLogin={(user) => { setCurrentUser(user); }}
           switchToSignup={() => setModal("signup")}
+          switchToForgot={() => setModal("forgot")}
           hint="Log in to send a booking request."
+        />
+      )}
+
+      {modal === "forgot" && (
+        <ForgotPasswordModal
+          onClose={() => setModal(null)}
+          switchToLogin={() => setModal("login")}
         />
       )}
 
@@ -596,7 +650,70 @@ function HomePage({ setPage, setModal, musicians, setSelectedMusician, setBookin
   return (
     <>
       <section className="hero">
-        <div className="hero-pattern" />
+        <div className="hero-pattern">
+          <svg viewBox="0 0 680 420" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="340" cy="0" rx="280" ry="160" fill="rgba(201,168,76,0.07)"/>
+            <ellipse cx="340" cy="0" rx="180" ry="100" fill="rgba(201,168,76,0.05)"/>
+            <ellipse cx="340" cy="420" rx="320" ry="120" fill="rgba(26,47,26,0.6)"/>
+            <circle cx="340" cy="210" r="80" fill="none" stroke="rgba(201,168,76,0.08)" strokeWidth="0.8"/>
+            <circle cx="340" cy="210" r="130" fill="none" stroke="rgba(201,168,76,0.08)" strokeWidth="0.8"/>
+            <circle cx="340" cy="210" r="190" fill="none" stroke="rgba(201,168,76,0.08)" strokeWidth="0.8"/>
+            <circle cx="340" cy="210" r="260" fill="none" stroke="rgba(201,168,76,0.08)" strokeWidth="0.8"/>
+            <circle cx="340" cy="210" r="340" fill="none" stroke="rgba(201,168,76,0.08)" strokeWidth="0.8"/>
+            <path d="M80 420 Q70 360 90 300 Q110 240 85 180 Q60 120 90 60 Q110 20 130 0" fill="none" stroke="#2d5a2d" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M88 300 Q120 280 150 290" fill="none" stroke="#3a7a3a" strokeWidth="1.2" strokeLinecap="round"/>
+            <path d="M87 200 Q115 185 140 195" fill="none" stroke="#3a7a3a" strokeWidth="1.2" strokeLinecap="round"/>
+            <path d="M90 120 Q60 105 40 115" fill="none" stroke="#3a7a3a" strokeWidth="1.2" strokeLinecap="round"/>
+            <path d="M91 80 Q120 65 145 72" fill="none" stroke="#3a7a3a" strokeWidth="1.2" strokeLinecap="round"/>
+            <ellipse cx="95" cy="290" rx="18" ry="9" fill="#2d5a2d" opacity="0.7" transform="rotate(-25 95 290)"/>
+            <ellipse cx="148" cy="292" rx="14" ry="7" fill="#4a8c4a" opacity="0.5" transform="rotate(15 148 292)"/>
+            <ellipse cx="88" cy="195" rx="16" ry="8" fill="#2d5a2d" opacity="0.7" transform="rotate(-30 88 195)"/>
+            <ellipse cx="143" cy="197" rx="13" ry="6" fill="#4a8c4a" opacity="0.5" transform="rotate(20 143 197)"/>
+            <ellipse cx="42" cy="113" rx="14" ry="7" fill="#2d5a2d" opacity="0.7" transform="rotate(10 42 113)"/>
+            <ellipse cx="148" cy="72" rx="15" ry="7" fill="#2d5a2d" opacity="0.7" transform="rotate(25 148 72)"/>
+            <path d="M600 420 Q610 355 590 290 Q570 225 595 160 Q620 95 595 30 Q580 5 560 0" fill="none" stroke="#2d5a2d" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M591 290 Q560 270 530 280" fill="none" stroke="#3a7a3a" strokeWidth="1.2" strokeLinecap="round"/>
+            <path d="M593 190 Q562 175 535 183" fill="none" stroke="#3a7a3a" strokeWidth="1.2" strokeLinecap="round"/>
+            <path d="M594 110 Q625 95 648 105" fill="none" stroke="#3a7a3a" strokeWidth="1.2" strokeLinecap="round"/>
+            <ellipse cx="585" cy="278" rx="18" ry="9" fill="#2d5a2d" opacity="0.7" transform="rotate(20 585 278)"/>
+            <ellipse cx="532" cy="282" rx="14" ry="7" fill="#4a8c4a" opacity="0.5" transform="rotate(-15 532 282)"/>
+            <ellipse cx="587" cy="182" rx="16" ry="8" fill="#2d5a2d" opacity="0.7" transform="rotate(25 587 182)"/>
+            <ellipse cx="646" cy="103" rx="14" ry="7" fill="#2d5a2d" opacity="0.7" transform="rotate(-10 646 103)"/>
+            <ellipse cx="540" cy="50" rx="15" ry="7" fill="#2d5a2d" opacity="0.7" transform="rotate(-25 540 50)"/>
+            <ellipse cx="160" cy="55" rx="10" ry="7" fill="rgba(201,168,76,0.18)" transform="rotate(-20 160 55)"/>
+            <line x1="170" y1="52" x2="170" y2="28" stroke="#C9A84C" strokeWidth="1.2" opacity="0.22"/>
+            <path d="M170 28 Q182 32 178 40" fill="none" stroke="#C9A84C" strokeWidth="1.2" opacity="0.22" strokeLinecap="round"/>
+            <ellipse cx="510" cy="45" rx="10" ry="7" fill="rgba(201,168,76,0.18)" transform="rotate(-20 510 45)"/>
+            <line x1="520" y1="42" x2="520" y2="18" stroke="#C9A84C" strokeWidth="1.2" opacity="0.22"/>
+            <path d="M520 18 Q532 22 528 30" fill="none" stroke="#C9A84C" strokeWidth="1.2" opacity="0.22" strokeLinecap="round"/>
+            <ellipse cx="195" cy="200" rx="9" ry="6" fill="rgba(201,168,76,0.18)" transform="rotate(-15 195 200)"/>
+            <line x1="204" y1="197" x2="204" y2="175" stroke="#C9A84C" strokeWidth="1.2" opacity="0.18"/>
+            <ellipse cx="475" cy="185" rx="9" ry="6" fill="rgba(201,168,76,0.18)" transform="rotate(-15 475 185)"/>
+            <line x1="484" y1="182" x2="484" y2="160" stroke="#C9A84C" strokeWidth="1.2" opacity="0.18"/>
+            <path d="M484 160 Q494 164 491 172" fill="none" stroke="#C9A84C" strokeWidth="1.2" opacity="0.18" strokeLinecap="round"/>
+            <ellipse cx="320" cy="90" rx="10" ry="7" fill="rgba(201,168,76,0.18)" transform="rotate(-20 320 90)"/>
+            <line x1="330" y1="87" x2="330" y2="62" stroke="#C9A84C" strokeWidth="1.2" opacity="0.20"/>
+            <line x1="220" y1="248" x2="460" y2="248" stroke="#C9A84C" strokeWidth="0.5" opacity="0.08"/>
+            <line x1="220" y1="256" x2="460" y2="256" stroke="#C9A84C" strokeWidth="0.5" opacity="0.08"/>
+            <line x1="220" y1="264" x2="460" y2="264" stroke="#C9A84C" strokeWidth="0.5" opacity="0.08"/>
+            <line x1="220" y1="272" x2="460" y2="272" stroke="#C9A84C" strokeWidth="0.5" opacity="0.08"/>
+            <line x1="220" y1="280" x2="460" y2="280" stroke="#C9A84C" strokeWidth="0.5" opacity="0.08"/>
+            <ellipse cx="270" cy="268" rx="7" ry="5" fill="rgba(201,168,76,0.18)" transform="rotate(-15 270 268)"/>
+            <line x1="277" y1="266" x2="277" y2="248" stroke="#C9A84C" strokeWidth="0.8" opacity="0.18"/>
+            <ellipse cx="360" cy="272" rx="7" ry="5" fill="rgba(201,168,76,0.18)" transform="rotate(-15 360 272)"/>
+            <line x1="367" y1="270" x2="367" y2="252" stroke="#C9A84C" strokeWidth="0.8" opacity="0.18"/>
+            <circle cx="230" cy="130" r="2" fill="#C9A84C" opacity="0.28"/>
+            <circle cx="450" cy="155" r="2" fill="#C9A84C" opacity="0.28"/>
+            <circle cx="340" cy="50" r="2.5" fill="#C9A84C" opacity="0.28"/>
+            <circle cx="180" cy="310" r="1.5" fill="#C9A84C" opacity="0.15"/>
+            <circle cx="500" cy="320" r="1.5" fill="#C9A84C" opacity="0.15"/>
+            <circle cx="560" cy="130" r="2" fill="#C9A84C" opacity="0.28"/>
+            <circle cx="150" cy="160" r="1.5" fill="#C9A84C" opacity="0.15"/>
+            <circle cx="530" cy="240" r="1.5" fill="#C9A84C" opacity="0.15"/>
+            <path d="M338 175 Q348 165 345 155 Q342 145 335 148 Q328 151 330 160 Q332 168 340 172 Q350 178 348 192 Q346 206 336 210 Q326 214 322 205 Q318 196 325 190" fill="none" stroke="#C9A84C" strokeWidth="1.5" opacity="0.12" strokeLinecap="round"/>
+            <line x1="337" y1="210" x2="337" y2="230" stroke="#C9A84C" strokeWidth="1.5" opacity="0.12" strokeLinecap="round"/>
+          </svg>
+        </div>
         <div className="hero-content">
           <div className="hero-badge">🎵 For Churches & Events</div>
           <h1>Find Trusted Church<br /><em>Musicians</em>—Fast</h1>
@@ -1042,8 +1159,111 @@ function EditProfileForm({ currentUser, setCurrentUser }) {
   );
 }
 
+// ─── VerifyBanner ─────────────────────────────────────────────────────────────
+function VerifyBanner({ currentUser, setCurrentUser }) {
+  const [sent, setSent] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  const resend = async () => {
+    await resendVerificationEmail();
+    setSent(true);
+    setTimeout(() => setSent(false), 5000);
+  };
+
+  const checkVerified = async () => {
+    setChecking(true);
+    const verified = await refreshEmailVerification();
+    if (verified) {
+      setCurrentUser(u => ({ ...u, emailVerified: true }));
+    } else {
+      alert("Email not verified yet. Please check your inbox and click the link.");
+    }
+    setChecking(false);
+  };
+
+  return (
+    <div className="verify-banner">
+      <span>📧 Please verify your email address — check your inbox for a verification link.</span>
+      {sent ? (
+        <span style={{ color: "#15803d", fontWeight: 700 }}>✅ Email sent!</span>
+      ) : (
+        <button onClick={resend}>Resend Email</button>
+      )}
+      <button onClick={checkVerified} disabled={checking} style={{ background: "var(--purple-light)" }}>
+        {checking ? "Checking…" : "I've Verified"}
+      </button>
+    </div>
+  );
+}
+
+// ─── ForgotPasswordModal ──────────────────────────────────────────────────────
+function ForgotPasswordModal({ onClose, switchToLogin }) {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    if (!email.trim()) return;
+    setLoading(true); setError("");
+    try {
+      await resetPassword(email.trim());
+      setDone(true);
+    } catch (e) {
+      setError("No account found with that email address.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <h2 className="modal-title">Reset Password</h2>
+            <p className="modal-sub">We'll send a reset link to your email</p>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {done ? (
+          <div style={{ textAlign: "center", padding: "24px 0" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📧</div>
+            <h3 style={{ color: "var(--purple)", fontFamily: "Playfair Display", marginBottom: 8 }}>Check your inbox!</h3>
+            <p style={{ color: "var(--muted)", marginBottom: 20 }}>
+              We sent a password reset link to <strong>{email}</strong>. Click it to set a new password.
+            </p>
+            <button className="btn-full" onClick={switchToLogin}>Back to Login</button>
+          </div>
+        ) : (
+          <>
+            {error && <div className="alert error">{error}</div>}
+            <div className="form-group">
+              <label>Email Address</label>
+              <input
+                className="form-control"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && submit()}
+              />
+            </div>
+            <button className="btn-full" onClick={submit} disabled={loading || !email.trim()}>
+              {loading ? <span className="spinner" /> : "Send Reset Link"}
+            </button>
+            <div className="modal-footer">
+              Remember your password? <button onClick={switchToLogin}>Log in</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── LoginModal ───────────────────────────────────────────────────────────────
-function LoginModal({ onClose, onLogin, switchToSignup, hint }) {
+function LoginModal({ onClose, onLogin, switchToSignup, switchToForgot, hint }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1082,6 +1302,11 @@ function LoginModal({ onClose, onLogin, switchToSignup, hint }) {
         <button className="btn-full" onClick={submit} disabled={loading}>
           {loading ? <span className="spinner" /> : "Log In"}
         </button>
+        <div style={{ textAlign: "right", marginTop: 8 }}>
+          <button onClick={switchToForgot} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>
+            Forgot password?
+          </button>
+        </div>
         <div className="modal-footer">
           Don't have an account? <button onClick={switchToSignup}>Sign up</button>
         </div>
@@ -1152,6 +1377,31 @@ function SignupModal({ onClose, onSignup, switchToLogin }) {
         <div className="form-group">
           <label>Password</label>
           <input className="form-control" type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} onKeyDown={e => e.key === "Enter" && submit()} />
+          {form.password.length > 0 && (() => {
+            const errors = validatePassword(form.password);
+            const strength = 4 - errors.length;
+            const colors = ["#b91c1c", "#d97706", "#ca8a04", "#15803d"];
+            const rules = [
+              { label: "8+ characters", pass: form.password.length >= 8 },
+              { label: "Uppercase letter", pass: /[A-Z]/.test(form.password) },
+              { label: "Number", pass: /[0-9]/.test(form.password) },
+              { label: "Special character", pass: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) },
+            ];
+            return (
+              <>
+                <div className="password-strength">
+                  <div className="password-strength-bar" style={{ width: `${strength * 25}%`, background: colors[strength - 1] || "#e5e7eb" }} />
+                </div>
+                <div className="password-rules">
+                  {rules.map(r => (
+                    <span key={r.label} className={`password-rule ${r.pass ? "pass" : "fail"}`}>
+                      {r.pass ? "✓" : "✗"} {r.label}
+                    </span>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         <button className="btn-full gold" onClick={submit} disabled={loading}>
